@@ -1,6 +1,6 @@
 # 🍅 Tomato Leaf Disease Early Prediction
 ---
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Visit%20App-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://drowsiness-detection-system-99de.onrender.com)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Visit%20App-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://tomato-disease-early-prediction-5.onrender.com)
 
 ## 1. Overview
 
@@ -31,7 +31,7 @@ Tomato crops are vulnerable to multiple fungal, bacterial, and viral diseases. B
 
 ### Live URL
 ```
-http://localhost:8000
+https://tomato-disease-early-prediction-5.onrender.com
 ```
 Run the server locally (see Installation section), then open the above URL in your browser.
 
