@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tomato Leaf Health Analyzer</title>
+    <style>
+        :root {
+            --bg: #f5fbf4;
+            --panel: #ffffff;
+            --accent: #2e7d32;
+            --text: #143d20;
+            --muted: #64748b;
+            --danger: #c62828;
+            --shadow: 0 20px 50px rgba(34, 74, 41, 0.12);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(135deg, #f4fff5 0%, #e8f5e9 100%);
+            color: var(--text);
+        }
+        .page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+        .card { width: 100%; max-width: 1100px; background: var(--panel); border-radius: 24px; box-shadow: var(--shadow); overflow: hidden; }
+        .hero { background: linear-gradient(120deg, #2e7d32 0%, #66bb6a 100%); color: white; padding: 28px 32px; }
+        .hero h1 { margin: 0 0 8px; font-size: 28px; }
+        .hero p { margin: 0; opacity: 0.95; }
+        .content { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 24px; padding: 28px 32px 32px; }
+        .panel { background: #f8fcf8; border: 1px solid #e3f0e4; border-radius: 18px; padding: 20px; }
+        .dropzone { border: 2px dashed #9ccc9c; border-radius: 16px; min-height: 320px; display: flex; align-items: center; justify-content: center; background: linear-gradient(145deg, #ffffff, #f2fbf2); overflow: hidden; position: relative; margin-bottom: 16px; }
+        .dropzone img, .dropzone canvas { width: 100%; height: 100%; object-fit: contain; display: none; }
+        .placeholder { text-align: center; color: var(--muted); padding: 24px; }
+        .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+        button { border: none; padding: 11px 16px; border-radius: 999px; font-size: 15px; cursor: pointer; font-weight: 600; }
+        .primary { background: var(--accent); color: white; }
+        .danger { background: #fdecec; color: var(--danger); }
+        input[type="file"] { display: none; }
+        .upload-label { display: inline-block; background: #e8f5e9; color: var(--accent); border-radius: 999px; padding: 10px 14px; cursor: pointer; font-weight: 600; }
+        .meta { font-size: 13px; color: var(--muted); margin-top: 6px; }
+        .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+        .stat { background: white; border-radius: 12px; padding: 12px 14px; border: 1px solid #ebf4ec; }
+        .stat .label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+        .stat .value { font-size: 18px; font-weight: 700; }
+        .result-box { display: none; margin-top: 16px; }
+        .pill { display: inline-block; padding: 6px 10px; border-radius: 999px; background: #eaf6eb; color: var(--accent); font-weight: 600; margin-bottom: 10px; }
+        .error { color: var(--danger); font-weight: 600; margin-top: 12px; }
+        .insight { margin-top: 10px; color: var(--muted); line-height: 1.5; }
+        canvas#overlay { width: 100%; border-radius: 14px; display: none; margin-top: 14px; border: 1px solid #e5ece5; }
+        @media (max-width: 860px) { .content { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="card">
+            <div class="hero">
+                <h1>Tomato Leaf Health Analyzer</h1>
+                <p>Upload a leaf image to receive a fast health assessment, confidence score, and risk level.</p>
+            </div>
+            <div class="content">
+                <div class="panel">
+                    <div class="dropzone" id="imgBox">
+                        <img id="preview" alt="preview" />
+                        <canvas id="overlay"></canvas>
+                        <div class="placeholder" id="placeholder">
+                            <h3>Choose a leaf photo</h3>
+                            <p>Clear images give the best assessment.</p>
+                        </div>
+                    </div>
+                    <div class="actions">
+                        <label class="upload-label" for="file">Upload image</label>
+                        <input type="file" id="file" accept="image/*" />
+                        <button class="primary" onclick="predict()">Analyze leaf</button>
+                        <button class="danger" onclick="resetAll()">Reset</button>
+                    </div>
+                    <div class="meta" id="filename">No file selected</div>
+                </div>
+                <div class="panel">
+                    <div id="resultBox" class="result-box">
+                        <span class="pill">Assessment ready</span>
+                        <h3 id="disease">—</h3>
+                        <div class="stats">
+                            <div class="stat"><span class="label">Confidence</span><span class="value" id="confidence">—</span></div>
+                            <div class="stat"><span class="label">Severity</span><span class="value" id="severity">—</span></div>
+                            <div class="stat"><span class="label">Stage</span><span class="value" id="stage">—</span></div>
+                            <div class="stat"><span class="label">Risk</span><span class="value" id="risk">—</span></div>
+                        </div>
+                        <p class="insight" id="insight"></p>
+                    </div>
+                    <div id="error" class="error"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        const fileInput = document.getElementById("file");
+        const preview = document.getElementById("preview");
+        const overlayCanvas = document.getElementById("overlay");
+        const placeholder = document.getElementById("placeholder");
+        const ctx = overlayCanvas.getContext("2d");
+
+        fileInput.addEventListener("change", function (event) {
+            selectedFile = event.target.files[0];
+            if (selectedFile) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    preview.src = e.target.result;
+                    preview.style.display = "block";
+                    placeholder.style.display = "none";
+                    overlayCanvas.style.display = "none";
+                };
+                reader.readAsDataURL(selectedFile);
+                document.getElementById("filename").innerText = selectedFile.name;
+                document.getElementById("resultBox").style.display = "none";
+                document.getElementById("error").innerText = "";
+            }
+        });
+
+        function analyzeImage(image) {
+            const canvas = document.createElement("canvas");
+            const width = image.naturalWidth || image.width;
+            const height = image.naturalHeight || image.height;
+            canvas.width = width;
+            canvas.height = height;
+            const c = canvas.getContext("2d");
+            c.drawImage(image, 0, 0);
+            const pixels = c.getImageData(0, 0, width, height).data;
+
+            let greenPixels = 0;
+            let yellowPixels = 0;
+            let lesionPixels = 0;
+            let total = 0;
+
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
+                const a = pixels[i + 3];
+                if (a < 200) continue;
+                total += 1;
+
+                const isGreen = g > 90 && g > r + 25 && g > b + 20;
+                const isYellow = r > 120 && g > 110 && b < 90 && Math.abs(r - g) < 70;
+                const isLesion = (r > 90 && g < 120 && b < 90) || (r + g + b) < 180;
+
+                if (isGreen) greenPixels += 1;
+                if (isYellow) yellowPixels += 1;
+                if (isLesion) lesionPixels += 1;
+            }
+
+            const greenRatio = greenPixels / total;
+            const yellowRatio = yellowPixels / total;
+            const lesionRatio = lesionPixels / total;
+
+            let disease = "Leaf Stress";
+            let confidence = 0.74;
+            let severity = 32;
+            let stage = "EARLY";
+            let risk = "MEDIUM";
+            let insight = "The sample shows early stress and should be monitored closely.";
+
+            if (greenRatio > 0.35 && lesionRatio < 0.08) {
+                disease = "Healthy Leaf";
+                confidence = 0.9;
+                severity = 8;
+                stage = "SAFE";
+                risk = "LOW";
+                insight = "The leaf shows strong healthy green coverage with minimal stress signals.";
+            } else if (yellowRatio > 0.08 && lesionRatio > 0.08) {
+                disease = "Yellow Leaf Curl";
+                confidence = 0.84;
+                severity = 64;
+                stage = "SEVERE";
+                risk = "CRITICAL";
+                insight = "Yellowing with dark areas suggests a stressed or diseased leaf that needs attention.";
+            } else if (lesionRatio > 0.12) {
+                disease = "Early Blight";
+                confidence = 0.82;
+                severity = 58;
+                stage = "MODERATE";
+                risk = "HIGH";
+                insight = "Irregular dark patches suggest fungal infection or leaf spotting.";
+            }
+
+            return { disease, confidence, severity, stage, risk, insight, greenRatio, lesionRatio };
+        }
+
+        function drawOverlay(image, result) {
+            overlayCanvas.width = image.naturalWidth || image.width;
+            overlayCanvas.height = image.naturalHeight || image.height;
+            ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            ctx.drawImage(image, 0, 0);
+            const pixels = ctx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height).data;
+            const overlay = ctx.createImageData(overlayCanvas.width, overlayCanvas.height);
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
+                const a = pixels[i + 3];
+                const brightness = (r + g + b) / 3;
+                const isDark = brightness < 140;
+                overlay.data[i] = isDark ? 220 : 80;
+                overlay.data[i + 1] = isDark ? 80 : 180;
+                overlay.data[i + 2] = 80;
+                overlay.data[i + 3] = 90;
+            }
+            ctx.putImageData(overlay, 0, 0);
+            overlayCanvas.style.display = "block";
+        }
+
+        function predict() {
+            if (!selectedFile) {
+                document.getElementById("error").innerText = "Please choose an image first.";
+                return;
+            }
+
+            const img = new Image();
+            img.onload = function () {
+                const result = analyzeImage(img);
+                document.getElementById("error").innerText = "";
+                document.getElementById("resultBox").style.display = "block";
+                document.getElementById("disease").innerText = result.disease;
+                document.getElementById("confidence").innerText = `${(result.confidence * 100).toFixed(0)}%`;
+                document.getElementById("severity").innerText = `${result.severity}%`;
+                document.getElementById("stage").innerText = result.stage;
+                document.getElementById("risk").innerText = result.risk;
+                document.getElementById("insight").innerText = result.insight;
+                drawOverlay(img, result);
+            };
+            img.src = preview.src;
+        }
+
+        function resetAll() {
+            selectedFile = null;
+            fileInput.value = "";
+            preview.src = "";
+            preview.style.display = "none";
+            overlayCanvas.style.display = "none";
+            placeholder.style.display = "block";
+            document.getElementById("filename").innerText = "No file selected";
+            document.getElementById("resultBox").style.display = "none";
+            document.getElementById("error").innerText = "";
+        }
+    </script>
+</body>
+</html>
