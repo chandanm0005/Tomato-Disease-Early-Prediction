@@ -401,7 +401,7 @@ jobs:
 
 ---
 
-## 14. Interview Talking Points
+## 14. Talking Points
 
 ### Why these technologies?
 
@@ -419,8 +419,3 @@ Designing the **early detection logic** — the model's training signal is class
 - **Client-side fallback vs full ML:** The pixel-ratio analysis in JS is fast but simplistic. It was added so the UI is usable even without a trained model, but it should never replace the neural network for actual diagnoses.
 - **Stateless design vs database:** Keeping the app stateless makes it easier to deploy and scale, but means scan history and user data are not persisted. A real production system would need a database for this.
 
-### Optimizations
-- Transfer learning reduced training time from days to ~30 minutes by starting from ImageNet weights
-- Resizing to 160px instead of 224px cut per-image inference time by ~35% with minimal accuracy loss
-- Lazy import of `infer_gradcam` in the API route means the server starts instantly even if PyTorch is not installed — the error only surfaces at prediction time
-- Temp file cleanup in a `finally` block ensures no disk leak even when inference crashes
